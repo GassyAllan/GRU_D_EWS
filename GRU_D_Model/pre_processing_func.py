@@ -31,7 +31,7 @@ def train_val_test_split(data, labels, train_prop = 0.7, val_prop = 0.1, test_va
 def df_to_np_pipe (df,cols, time_steps_req):
     '''
     Takes df with vital signs and returns an np.array of data and array of episode order
-    Input: DF (Spell, Time_step, Vitals sigs....), number of time stps required
+    Input: DF (Spell, Time_step, Vitals signs....), number of time steps required
     Returns: np.array (Batch, Time_step, Features)
     Feature order: Time_lag, RR, SBP, DBP, HR, Temp, Spo2
     '''
@@ -44,7 +44,7 @@ def df_to_np_pipe (df,cols, time_steps_req):
     for epi in episodes:
         data = (df[df['episode_id'] == epi]).reset_index() # Reset so you can directly index
         length = len(data)
-        # If spell has less than required, add availble data to beginning of array
+        # If spell has less than required, add available data to beginning of array
         #Using Loc you have to directly index rather than reverse slice
         if length < time_steps_req:
             X[id,:length,:] = data.loc[0:length, cols].to_numpy()
@@ -57,7 +57,7 @@ def df_to_np_pipe (df,cols, time_steps_req):
     return X, episodes
 
 
-def train_mask_delta_generator (train_data, train_label, sampling_strategy = 0.5):
+def train_mask_delta_generator (train_data, train_label):
     ''' Normalises and generates masks requried for decay learning
     Learns parameters for normalisation and passes on to val_test generator
     Takes data array (Sample, Time_Step, Feature)
@@ -103,7 +103,7 @@ def train_mask_delta_generator (train_data, train_label, sampling_strategy = 0.5
         i = missing_index[0][idx] 
         j = missing_index[1][idx]
         k = missing_index[2][idx]
-            # If previous not missing then delta = current time lag last observered + previous
+            # If previous not missing then delta = current time lag last observed + previous
         if j != 0 and j != (X.shape[1]-1): # This logic is to avoid first and last! need to alter j needs to be time step
             Delta[i,j+1,k] = Delta[i,j+1,k] + Delta[i,j,k]
         if j != 0:
@@ -122,10 +122,10 @@ def train_mask_delta_generator (train_data, train_label, sampling_strategy = 0.5
     return dataset_agger, train_y, lengths, X_mean, train_means, train_std, max_delta
 
 def val_test_mask_delta_generator (data, train_means, train_std, max_delta):
-    ''' Normalises and generates masks requried for decay learning
+    ''' Normalises and generates masks required for decay learning
     Learns parameters for normalisation and passes on to val_test generator
     Takes: data array (Sample, Time_Step, Feature), 
-    train_means, train_std, max_delta - parameters from training for normlisation 
+    train_means, train_std, max_delta - parameters from training for normalisation 
     Returns 
     Model input(Sample, model input(4), time_step, feature)
     Length: Array seq_len for trimming (sample)
@@ -161,12 +161,12 @@ def val_test_mask_delta_generator (data, train_means, train_std, max_delta):
         i = missing_index[0][idx] 
         j = missing_index[1][idx]
         k = missing_index[2][idx]
-            # If previous not missing then delta = current time lag last observered + previous
+            # If previous not missing then delta = current time lag last observed + previous
         if j != 0 and j != (X.shape[1]-1): # This logic is to avoid first and last! need to alter j needs to be time step
             Delta[i,j+1,k] = Delta[i,j+1,k] + Delta[i,j,k]
         if j != 0:
             X_last_obsv[i,j,k] = X_last_obsv[i,j-1,k] # last observation
-    # normalize - currently max/min scaled, keeps 0-1
+    # normalize - currently max/min scaled keeps 0-1
     Delta = Delta / max_delta
 
     X = np.expand_dims(X, axis=1)
