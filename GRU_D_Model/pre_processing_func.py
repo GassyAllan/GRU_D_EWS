@@ -57,7 +57,7 @@ def df_to_np_pipe (df,cols, time_steps_req):
     return X, episodes
 
 
-def train_mask_delta_generator (train_data, train_label):
+def train_mask_delta_generator (data):
     ''' Normalises and generates masks requried for decay learning
     Learns parameters for normalisation and passes on to val_test generator
     Takes data array (Sample, Time_Step, Feature)
@@ -70,12 +70,13 @@ def train_mask_delta_generator (train_data, train_label):
     
     print('Start to generate Mask, Delta, Last_observed_X ...')
     
-    
+    flow = data[:,:,7]
+    data[:,:,7][flow == 0] = 0.1
     # Convert zero 'missing' timesteps to nan
-    train_data[train_data == 0] = np.nan
+    data[data == 0] = np.nan
 
     # Extract the feature space
-    X = Xt[:,:,1:]
+    X = data[:,:,1:]
     # Where there is no observation - 0 == no Observation, 1 == observation present
     Mask = (X != -1)
     # Get training means to use for val_test generator
@@ -86,10 +87,13 @@ def train_mask_delta_generator (train_data, train_label):
 
     # Time_lags is S vector in paper -> Contains time lags of all examples (N x Time_steps)
     # Get lags from first index
-    time_lags = Xt[:,:,0]
+    # Alter the anchor_time to time_lags
+    time_lags = data[:,:,0]
+    lags = np.diff(time_lags)
+    time_lags[:,1:] = lags
+
     # Find the lengths of each time series
     lengths =  (~np.isnan(time_lags)).sum(axis = 1)
-    time_lags[:,0] = 0
 
     Delta = np.repeat(time_lags, X.shape[2], axis=1) # Like np.tile
     Delta = np.reshape(Delta, X.shape) # Reshape into data matrix shape
@@ -108,7 +112,8 @@ def train_mask_delta_generator (train_data, train_label):
             Delta[i,j+1,k] = Delta[i,j+1,k] + Delta[i,j,k]
         if j != 0:
             X_last_obsv[i,j,k] = X_last_obsv[i,j-1,k] # last observation
-    # normalize Not sure this is required as S is not normalised - currently max/min scaled, keeps 0-1
+
+    # max/min scaled, keeps 0-1
     max_delta =  np.nanmax(Delta) 
     Delta = Delta / max_delta
 
@@ -119,7 +124,8 @@ def train_mask_delta_generator (train_data, train_label):
     dataset_agger = np.concatenate((X, X_last_obsv, Mask, Delta), axis = 1)
     X_mean = np.nanmean(X, axis = 0)
     print('Finished')
-    return dataset_agger, train_y, lengths, X_mean, train_means, train_std, max_delta
+    return dataset_agger, lengths, np.cumsum(time_lags, axis = 1), X_mean, train_means, train_std, max_delta
+
 
 def val_test_mask_delta_generator (data, train_means, train_std, max_delta):
     ''' Normalises and generates masks required for decay learning
@@ -132,6 +138,8 @@ def val_test_mask_delta_generator (data, train_means, train_std, max_delta):
     '''
     print('Start to generate Mask, Delta, Last_observed_X ...')
 
+    flow = data[:,:,7]
+    data[:,:,7][flow == 0] = 0.1
     data[data == 0] = np.nan
     X = data[:,:,1:].round()
 
@@ -139,10 +147,18 @@ def val_test_mask_delta_generator (data, train_means, train_std, max_delta):
     Mask = (X != -1)    
     # Normalise data to training ranges
     X = (X - train_means) / train_std
+    
+    # Get lags from first index
+    lags = np.diff(data[:,:,0])
+    # Alter the anchor_time to time_lags
     time_lags = data[:,:,0]
+    time_lags[:,1:] = lags
+
+
     # Find the lengths of each time series
+    
     lengths =  (~np.isnan(time_lags)).sum(axis = 1)
-    time_lags[:,0] = 0
+    
 
     # # Time_lags is S vector in paper -> Contains time lags of all examples (N x Time_steps)
     # time_lags = np.zeros((data.shape[0],data.shape[1]))
@@ -177,7 +193,7 @@ def val_test_mask_delta_generator (data, train_means, train_std, max_delta):
 
     print('Finished')
     
-    return dataset_agger , lengths
+    return dataset_agger , lengths,  np.cumsum(time_lags, axis = 1)
 
 
 class CustomDataset(Dataset):
@@ -218,9 +234,6 @@ def dataset_compiler (data, labels, lengths, length_required = 5):
 
     return dataset
 
-
-
-
 def collate_fn(batch):
     '''Takes batch and pads to max seq_len within the batch
     '''
@@ -256,35 +269,6 @@ class SortByLengthSampler(torch.utils.data.sampler.Sampler):
 
     def _get_max_length(self, matrix):
         return matrix.size(1)
-
-class WeightedSortByLengthSampler(torch.utils.data.sampler.Sampler):
-    def __init__(self, dataset, batch_size, class_weights):
-        self.dataset = dataset
-        self.batch_size = batch_size
-        self.class_weights = class_weights
-        self.indices = list(range(len(dataset)))
-        # Sort indices based on the maximum length of time steps within each matrix
-        self.indices.sort(key=lambda x: self._get_max_length(self.dataset[x][0]))
-
-    def __iter__(self):
-        batches = [self.indices[i:i + self.batch_size] for i in range(0, len(self.indices), self.batch_size)]
-        # Calculate probabilities for each sample based on class weights
-        probabilities = torch.tensor([self.class_weights[self.dataset[idx][1]] for idx in self.indices])
-        probabilities /= probabilities.sum()
-        # Sample indices based on weighted probabilities
-        sampled_indices = torch.multinomial(probabilities, len(probabilities), replacement=True)
-        sampled_indices = sampled_indices.tolist()
-        # Shuffle the sampled indices
-        random_permutation = torch.randperm(len(batches)).tolist()
-        shuffled_indices = [index for batch in random_permutation for index in sampled_indices[batch]]
-        return iter(shuffled_indices)
-    
-    def __len__(self):
-        return len(self.dataset)
-
-    def _get_max_length(self, matrix):
-        return matrix.size(1)
-    
 
 
 def dataloader_compiler (dataset, batch_size = 20):
