@@ -1,4 +1,4 @@
-# GRU_D_EWS
+# GRU-D EWS
 
 ## Overview
 Code of Re-implementing the methodology in the paper:
@@ -35,13 +35,13 @@ To set up the project locally, follow these steps:
 
 ## Usage
 
-The notebook highlights the pre-processing pipeline and provides analysis and examples of instances.  This is found here: [example notebook](GRU_D_Model/GRU_D_Demo.ipynb).
+The notebook highlights the pre-processing pipeline and provides analysis and examples of instances.  This is found here: [GRU-D Demo Notebook](GRU_D_Model/GRU_D_Demo.ipynb).
 
 ## Features
 
-Synethetic Data can be found here:[synethetic_data](Data/ews_synthetic_data.csv).  This data was generated using Hidden Markov Models using parameters that are clinically plausable using four possible states (Stable, Unstable, Peri-arrest, Dead).  It contains 1000 examples of vital sign sequences within an in-patient environment, of which 200 result in an adverse outcome (episode_id: 2000-2199) and 800 result in hospital survival/discharge (episode_id: 2200-2999).  This data is to demonstrate the pipeline used to develop the GRU-D model described in the paper and is not reflective of real-world clinical data, which is **NOT** publically availble for patient confidentiality reasons.
+Synethetic Data can be found here: [Synethetic Data](Data/ews_synthetic_data.csv).  This data was generated using Hidden Markov Models using parameters that are clinically plausable using four possible states (Stable, Unstable, Peri-arrest, Dead).  It contains 1000 examples of vital sign sequences within an in-patient environment, of which 200 result in an adverse outcome (episode_id: 2000-2199) and 800 result in hospital survival/discharge (episode_id: 2200-2999).  This data is to demonstrate the pipeline used to develop the GRU-D model described in the paper and is not reflective of real-world clinical data, which is **NOT** publically availble for patient confidentiality reasons.
 
-Helper functions are found in the folder [GRU_D_Model](GRU_D_Model).  
+Helper functions are found in the folder [GRU D Model](GRU_D_Model).  
 
 These are divided into:
 
